@@ -28,5 +28,12 @@ yarn.lock
 .env.local
 .env.*.local
 
-# Arquivos grandes gerados (se necessário)
-# code.js (pode ser muito grande, mas geralmente versionamos)
+# Arquivos grandes gerados
+code.js
+templates/*.json
+templates/*.json.backup
+
+# Manter apenas o template-index.json e arquivos de documentação
+!templates/template-index.json
+!templates/README.md
+!templates/TEMPLATE_REGISTRATION.md
