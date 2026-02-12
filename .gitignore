@@ -1,0 +1,32 @@
+# Dependências
+node_modules/
+package-lock.json
+yarn.lock
+
+# Arquivos de build gerados
+*.log
+.DS_Store
+
+# Arquivos de backup
+*.backup
+*.bak
+*~
+
+# Arquivos temporários
+*.tmp
+*.temp
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Arquivos de ambiente
+.env
+.env.local
+.env.*.local
+
+# Arquivos grandes gerados (se necessário)
+# code.js (pode ser muito grande, mas geralmente versionamos)

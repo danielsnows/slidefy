@@ -1,0 +1,9 @@
+[
+  {
+    "id": "domingo",
+    "name": "Domingo",
+    "slides": 7,
+    "file": "carousel_domingo.json",
+    "thumbnail": "images/templates/domingo.png"
+  }
+]

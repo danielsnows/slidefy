@@ -1,0 +1,11 @@
+{
+  "name": "slidefy-figma-plugin",
+  "version": "1.0.0",
+  "description": "Plugin Figma para criação de carrosséis contínuos para Instagram.",
+  "private": true,
+  "scripts": {
+    "build": "node embed-images.js && node build-templates.js",
+    "fetch-template": "node scripts/fetch-figma-template.js",
+    "lint": "echo \"Sem linter configurado ainda\""
+  }
+}
