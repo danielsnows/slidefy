@@ -194,6 +194,19 @@ async function createNodeFromTemplate(
       }
       break;
 
+    case 'SLICE':
+      // Slices do JSON são ignorados; o plugin cria os slices após criar o frame
+      return null;
+
+    case 'VECTOR':
+    case 'BOOLEAN_OPERATION':
+    case 'STAR':
+    case 'LINE':
+    case 'ELLIPSE':
+    case 'POLYGON':
+      // Formas vetoriais não suportadas na recriação; pular sem quebrar a árvore
+      return null;
+
     default:
       console.warn(`Tipo de nó não suportado: ${nodeData.type}`);
       return null;
@@ -341,6 +354,59 @@ async function createNodeFromTemplate(
   return node;
 }
 
+/** Texto exibido no frame de instruções de exportação */
+const EXPORT_INSTRUCTIONS_TEXT =
+  "Como exportar os slides:\n\n" +
+  "1. Selecione as camadas Slice (slice-1 a slice-7) no painel de camadas\n" +
+  "2. No painel direito, clique em Export\n" +
+  "3. Escolha o formato (PNG ou JPG) e a escala (1x, 2x, etc.)\n" +
+  "4. Clique em Exportar para baixar as imagens";
+
+/**
+ * Cria o frame com instruções de exportação (acima do template)
+ */
+async function createExportInstructionsFrame(templateWidth: number): Promise<FrameNode> {
+  const frame = figma.createFrame();
+  frame.name = "Instruções de exportação";
+  frame.fills = [{ type: "SOLID", color: { r: 0.97, g: 0.97, b: 0.98 }, opacity: 1 }];
+  frame.resize(templateWidth, 1); // altura ajustada após o texto
+
+  const text = figma.createText();
+  await figma.loadFontAsync({ family: "Inter", style: "Regular" });
+  text.characters = EXPORT_INSTRUCTIONS_TEXT;
+  text.fontSize = 14;
+  text.x = 16;
+  text.y = 16;
+  text.resize(templateWidth - 32, 400);
+  text.fills = [{ type: "SOLID", color: { r: 0.2, g: 0.2, b: 0.25 }, opacity: 1 }];
+
+  frame.appendChild(text);
+  frame.clipsContent = false;
+  // Ajusta altura do frame ao conteúdo do texto
+  const textHeight = text.height + 32;
+  frame.resize(templateWidth, textHeight);
+  return frame;
+}
+
+/**
+ * Cria as camadas Slice de exportação (uma por slide) dentro do frame do template
+ */
+function createExportSlices(
+  parentFrame: FrameNode,
+  slides: number,
+  slideWidth: number,
+  slideHeight: number
+): void {
+  for (let i = 0; i < slides; i++) {
+    const slice = figma.createSlice();
+    slice.name = `slice-${i + 1}`;
+    slice.x = i * slideWidth;
+    slice.y = 0;
+    slice.resize(slideWidth, slideHeight);
+    parentFrame.appendChild(slice);
+  }
+}
+
 /**
  * Função principal que cria o carrossel no canvas
  */
@@ -389,10 +455,45 @@ async function createCarouselOnCanvas(message: CreateCarouselMessage) {
     return;
   }
 
-  // Adiciona ao canvas
+  const gap = 24;
+  let instructionsFrame: FrameNode | null = null;
+
+  // Cria o frame de instruções de exportação (acima do template)
+  try {
+    instructionsFrame = await createExportInstructionsFrame(template.width);
+    instructionsFrame.x = 0;
+    instructionsFrame.y = 0;
+  } catch (e) {
+    console.error('Erro ao criar frame de instruções:', e);
+    figma.notify('⚠️ Frame de instruções não criado', { error: true });
+  }
+
+  // Posiciona o template: abaixo das instruções (se existir) ou em 0
+  mainFrame.x = 0;
+  mainFrame.y = instructionsFrame ? instructionsFrame.height + gap : 0;
+
+  // Adiciona os slices de exportação ao frame do template (um por slide)
+  try {
+    createExportSlices(
+      mainFrame as FrameNode,
+      template.slides,
+      template.slideWidth,
+      template.slideHeight
+    );
+  } catch (e) {
+    console.error('Erro ao criar slices:', e);
+    figma.notify('⚠️ Slices de exportação não criados', { error: true });
+  }
+
+  // Adiciona ao canvas: primeiro instruções (se existir), depois template
+  if (instructionsFrame) {
+    figma.currentPage.appendChild(instructionsFrame);
+  }
   figma.currentPage.appendChild(mainFrame);
-  figma.currentPage.selection = [mainFrame];
-  figma.viewport.scrollAndZoomIntoView([mainFrame]);
+
+  const toSelect = instructionsFrame ? [instructionsFrame, mainFrame] : [mainFrame];
+  figma.currentPage.selection = toSelect;
+  figma.viewport.scrollAndZoomIntoView(toSelect);
 
   figma.notify(`✅ Carrossel "${template.name}" criado com sucesso!`);
 }
