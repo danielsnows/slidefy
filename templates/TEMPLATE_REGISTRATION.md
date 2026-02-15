@@ -3,7 +3,7 @@
 ## Fluxo (quando você enviar um novo template)
 
 1. **Você envia:**
-   - Link do frame Figma (7560×1080) — ex: `https://figma.com/design/XXX/File?node-id=5-38`
+   - Link do frame Figma (7560×1080) — ex: `https://figma.com/design/9rxGzx3Vkv16GwxGYs5xPq/...?node-id=33-52`
    - Imagem PNG/JPG da thumbnail (quadrada)
 
 2. **O assistente faz:**

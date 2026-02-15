@@ -6,7 +6,7 @@
  *   FIGMA_ACCESS_TOKEN=xxx node scripts/fetch-figma-template.js [fileKey] [nodeId]
  *
  * Exemplo:
- *   FIGMA_ACCESS_TOKEN=xxx node scripts/fetch-figma-template.js 9rxGzx3Vkv16GwxGYs5xPq 5:38
+ *   FIGMA_ACCESS_TOKEN=xxx node scripts/fetch-figma-template.js 9rxGzx3Vkv16GwxGYs5xPq 33:52
  *
  * O token pode ser obtido em: Figma → Settings → Personal access tokens
  * O arquivo precisa estar acessível à sua conta (ou ser público).
@@ -18,7 +18,7 @@ const https = require("https");
 
 const TOKEN = process.env.FIGMA_ACCESS_TOKEN;
 const FILE_KEY = process.argv[2] || "9rxGzx3Vkv16GwxGYs5xPq";
-const NODE_ID = process.argv[3] || "5:38";
+const NODE_ID = process.argv[3] || "33:52";
 
 if (!TOKEN) {
   console.error("Erro: FIGMA_ACCESS_TOKEN não definido.");

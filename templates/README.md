@@ -21,7 +21,7 @@ Templates de carrossel embutidos no plugin. A partir da **versão 2**, os templa
    ```
    Exemplo:
    ```bash
-   FIGMA_ACCESS_TOKEN=xxx node scripts/fetch-figma-template.js 9rxGzx3Vkv16GwxGYs5xPq 5:38
+   FIGMA_ACCESS_TOKEN=xxx node scripts/fetch-figma-template.js 9rxGzx3Vkv16GwxGYs5xPq 33:52
    ```
    O token pode ser obtido em: Figma → Settings → Personal access tokens
 

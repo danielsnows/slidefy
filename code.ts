@@ -188,6 +188,10 @@ async function createNodeFromTemplate(
       if (nodeData.textCase) {
         textNode.textCase = nodeData.textCase as any;
       }
+      // Redimensiona o quadro de texto para que textAlignHorizontal CENTER tenha efeito visual
+      if (nodeData.width !== undefined && nodeData.height !== undefined) {
+        textNode.resize(nodeData.width, nodeData.height);
+      }
       break;
 
     default:
