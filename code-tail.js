@@ -23,7 +23,7 @@ async function loadFont(fontName) {
   }
 }
 
-async function createNodeFromTemplate(nodeData, userImages, photoLayerPrefix) {
+async function createNodeFromTemplate(nodeData, userImages, photoLayerPrefix, embeddedImages) {
   var node = null;
   switch (nodeData.type) {
     case 'FRAME':
@@ -84,13 +84,24 @@ async function createNodeFromTemplate(nodeData, userImages, photoLayerPrefix) {
       var fill = nodeData.fills[i];
       if (fill.type === 'SOLID') {
         fills.push({ type: 'SOLID', color: { r: fill.color.r, g: fill.color.g, b: fill.color.b }, opacity: fill.opacity != null ? fill.opacity : 1 });
-      } else if (fill.type === 'IMAGE' && nodeData.name.startsWith(photoLayerPrefix)) {
-        var photoIndex = parseInt(nodeData.name.replace(photoLayerPrefix, ''), 10) - 1;
-        if (photoIndex >= 0 && photoIndex < userImages.length) {
+      } else if (fill.type === 'IMAGE') {
+        if (nodeData.name.startsWith(photoLayerPrefix)) {
+          var photoIndex = parseInt(nodeData.name.replace(photoLayerPrefix, ''), 10) - 1;
+          if (photoIndex >= 0 && photoIndex < userImages.length) {
+            try {
+              var img = figma.createImage(userImages[photoIndex]);
+              fills.push({ type: 'IMAGE', scaleMode: 'FILL', imageHash: img.hash });
+            } catch (err) { console.warn('Erro ao carregar imagem ' + photoIndex, err); }
+          }
+        } else if (embeddedImages && nodeData.id && embeddedImages[nodeData.id]) {
           try {
-            var img = figma.createImage(userImages[photoIndex]);
-            fills.push({ type: 'IMAGE', scaleMode: 'FILL', imageHash: img.hash });
-          } catch (err) { console.warn('Erro ao carregar imagem ' + photoIndex, err); }
+            var b64 = embeddedImages[nodeData.id];
+            var bytes = base64ToUint8Array(b64);
+            var decImg = figma.createImage(bytes);
+            var rawMode = fill.scaleMode || 'FILL';
+            var scaleMode = (rawMode === 'STRETCH') ? 'FILL' : (['FILL', 'FIT', 'CROP', 'TILE'].indexOf(rawMode) >= 0 ? rawMode : 'FILL');
+            fills.push({ type: 'IMAGE', scaleMode: scaleMode, imageHash: decImg.hash });
+          } catch (err) { console.warn('Erro ao carregar imagem decorativa ' + nodeData.name, err); }
         }
       }
     }
@@ -120,7 +131,7 @@ async function createNodeFromTemplate(nodeData, userImages, photoLayerPrefix) {
   if (nodeData.children && (nodeData.type === 'GROUP' || (node && node.appendChild))) {
     var childNodes = [];
     for (var c = 0; c < nodeData.children.length; c++) {
-      var child = await createNodeFromTemplate(nodeData.children[c], userImages, photoLayerPrefix);
+      var child = await createNodeFromTemplate(nodeData.children[c], userImages, photoLayerPrefix, embeddedImages);
       if (child) childNodes.push(child);
     }
     if (nodeData.type === 'GROUP') {
@@ -194,7 +205,7 @@ async function createCarouselOnCanvas(msg) {
   figma.notify('Criando carrossel...', { timeout: 2000 });
   if (typeof preloadGoogleFonts === 'function') await preloadGoogleFonts();
 
-  var mainFrame = await createNodeFromTemplate(template.nodeTree, images, template.photoLayerNamePrefix || 'photo-');
+  var mainFrame = await createNodeFromTemplate(template.nodeTree, images, template.photoLayerNamePrefix || 'photo-', template.embeddedImages || null);
   if (!mainFrame) {
     figma.notify('Erro ao criar carrossel', { error: true });
     return;
