@@ -178,8 +178,9 @@ async function createNodeFromTemplate(
       if (nodeData.textAlignVertical) {
         textNode.textAlignVertical = nodeData.textAlignVertical as any;
       }
-      if (nodeData.letterSpacing) {
-        textNode.letterSpacing = nodeData.letterSpacing;
+      // letterSpacing: número (px) ou { unit: "PERCENT"|"PIXELS", value: number }
+      if (nodeData.letterSpacing !== undefined && nodeData.letterSpacing !== null) {
+        textNode.letterSpacing = nodeData.letterSpacing as LetterSpacing;
       }
       if (nodeData.lineHeight) {
         textNode.lineHeight = nodeData.lineHeight;

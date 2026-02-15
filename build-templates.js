@@ -8,11 +8,20 @@
 const fs = require('fs');
 const path = require('path');
 
+try {
+  run();
+} catch (e) {
+  console.error('ERRO:', e.message ? e.message.slice(0, 500) : String(e).slice(0, 500));
+  process.exit(1);
+}
+
+function run() {
 const ROOT = __dirname;
 const TEMPLATES_DIR = path.join(ROOT, 'templates');
 const IMAGES_DIR = path.join(ROOT, 'images');
 const TEMPLATES_IMAGES = path.join(IMAGES_DIR, 'templates');
 const CODE_JS = path.join(ROOT, 'code.js');
+const CODE_TAIL = path.join(ROOT, 'code-tail.js');
 const UI_HTML = path.join(ROOT, 'ui.html');
 
 // Garantir que pasta de thumbnails existe
@@ -66,27 +75,58 @@ if (startIdx === -1) {
   process.exit(1);
 }
 
-// Encontrar o fim do bloco (próximo "};" que fecha EMBEDDED_TEMPLATES)
+// Onde começa o bloco const EMBEDDED_TEMPLATES = {
 const searchStart = codeJs.indexOf('const EMBEDDED_TEMPLATES = {', startIdx);
+if (searchStart === -1) {
+  console.error('Bloco const EMBEDDED_TEMPLATES = { não encontrado em code.js após o marcador');
+  process.exit(1);
+}
+
+const openBraceIdx = codeJs.indexOf('{', searchStart);
+let replaceEnd = -1;
 let depth = 0;
-let endIdx = searchStart;
-for (let i = codeJs.indexOf('{', searchStart); i < codeJs.length; i++) {
-  if (codeJs[i] === '{') depth++;
-  if (codeJs[i] === '}') {
+let inString = false;
+let i = openBraceIdx;
+while (i < codeJs.length) {
+  const c = codeJs[i];
+  if (inString) {
+    if (c === '\\') { i += 2; continue; }
+    if (c === '"') { inString = false; }
+    i++;
+    continue;
+  }
+  if (c === '"') { inString = true; i++; continue; }
+  if (c === '{') { depth++; i++; continue; }
+  if (c === '}') {
     depth--;
-    if (depth === 0) {
-      endIdx = i + 1;
-      if (codeJs[i + 1] === ';') endIdx++;
+    if (depth === 0 && codeJs[i + 1] === ';') {
+      replaceEnd = i + 2;
       break;
     }
+    i++;
+    continue;
   }
+  i++;
 }
 
 const headerComment = '// ========== TEMPLATES EMBUTIDOS ==========';
 const headerStart = codeJs.lastIndexOf(headerComment, startIdx);
 const replaceStart = headerStart >= 0 ? headerStart : startIdx;
-codeJs = codeJs.slice(0, replaceStart) + headerComment + '\n' + startMarker + '\n' + templatesBlock + '\n' + codeJs.slice(endIdx);
-fs.writeFileSync(CODE_JS, codeJs);
+
+let codeAfterTemplate = (replaceEnd > replaceStart) ? codeJs.slice(replaceEnd) : '';
+const hasHandler = codeAfterTemplate.trim().length > 50 && /onmessage|createCarousel|loadTemplate/.test(codeAfterTemplate);
+let newCodeJs = codeJs.slice(0, replaceStart) + headerComment + '\n' + startMarker + '\n' + templatesBlock;
+if (fs.existsSync(CODE_TAIL)) {
+  newCodeJs += '\n' + fs.readFileSync(CODE_TAIL, 'utf8');
+} else if (hasHandler) {
+  newCodeJs += codeAfterTemplate;
+}
+try {
+  fs.writeFileSync(CODE_JS, newCodeJs);
+} catch (err) {
+  console.error('Erro ao escrever code.js:', err.code || err.name, (err.message || '').slice(0, 200));
+  process.exit(1);
+}
 
 // 2. Atualizar ui.html - substituir array de templates
 let uiHtml = fs.readFileSync(UI_HTML, 'utf8');
@@ -102,3 +142,4 @@ if (uiMatch) {
 fs.writeFileSync(UI_HTML, uiHtml);
 
 console.log(`Build concluído: ${Object.keys(embeddedTemplates).length} templates embutidos.`);
+} // run()
