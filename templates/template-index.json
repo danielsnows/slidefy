@@ -5,5 +5,12 @@
     "slides": 7,
     "file": "carousel_domingo.json",
     "thumbnail": "images/templates/domingo.png"
+  },
+  {
+    "id": "memoria",
+    "name": "Memória",
+    "slides": 5,
+    "file": "carousel_memoria.json",
+    "thumbnail": "images/templates/memoria.png"
   }
 ]

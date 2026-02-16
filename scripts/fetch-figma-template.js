@@ -18,11 +18,14 @@ const https = require("https");
 
 const TOKEN = process.env.FIGMA_ACCESS_TOKEN;
 const FILE_KEY = process.argv[2] || "9rxGzx3Vkv16GwxGYs5xPq";
-const NODE_ID = process.argv[3] || "33:52";
+const NODE_ID_RAW = process.argv[3] || "33:52";
+const NODE_ID = String(NODE_ID_RAW).replace(/-/g, ":"); // "106-8" -> "106:8"
+const TEMPLATE_ID = process.argv[4] || "domingo";
+const TEMPLATE_NAME = process.argv[5] || "Domingo";
 
 if (!TOKEN) {
   console.error("Erro: FIGMA_ACCESS_TOKEN não definido.");
-  console.error("Uso: FIGMA_ACCESS_TOKEN=xxx node scripts/fetch-figma-template.js [fileKey] [nodeId]");
+  console.error("Uso: FIGMA_ACCESS_TOKEN=xxx node scripts/fetch-figma-template.js [fileKey] [nodeId] [templateId] [templateName]");
   process.exit(1);
 }
 
@@ -211,7 +214,7 @@ function findNodeById(obj, id) {
 }
 
 async function main() {
-  console.log(`Buscando template: file=${FILE_KEY} node=${NODE_ID}`);
+  console.log(`Buscando template: file=${FILE_KEY} node=${NODE_ID} id=${TEMPLATE_ID} name=${TEMPLATE_NAME}`);
 
   const fileUrl = `https://api.figma.com/v1/files/${FILE_KEY}?ids=${encodeURIComponent(NODE_ID)}&depth=10`;
   const fileData = await fetch(fileUrl);
@@ -241,8 +244,20 @@ async function main() {
 
   console.log(`Frame: ${width}x${height} (~${slides} slides)`);
 
-  const nodeTree = serializeNode(node);
+  let nodeTree = serializeNode(node);
   const photoPrefix = "photo-";
+
+  // Para template "memoria": texto por cima de tudo (blend DIFFERENCE)
+  if (TEMPLATE_ID === "memoria" && nodeTree.children && nodeTree.children.length > 0) {
+    const textNodes = nodeTree.children.filter((c) => c.type === "TEXT");
+    const others = nodeTree.children.filter((c) => c.type !== "TEXT");
+    if (textNodes.length > 0) {
+      textNodes.forEach((t) => {
+        t.blendMode = "DIFFERENCE";
+      });
+      nodeTree.children = [...others, ...textNodes];
+    }
+  }
 
   // Contar camadas photo- e Slice
   const countByNamePrefix = (n, prefix) => {
@@ -262,10 +277,12 @@ async function main() {
   const embeddedImages = {};
   const BATCH_SIZE = 50;
 
+  // scale=0.5 para caber no limite do Figma createImage (~4096px por lado)
+  const scale = TEMPLATE_ID === "memoria" ? 0.5 : 1;
   for (let i = 0; i < imageNodeIds.length; i += BATCH_SIZE) {
     const batch = imageNodeIds.slice(i, i + BATCH_SIZE);
     const idsParam = batch.join(",");
-    const imgUrl = `https://api.figma.com/v1/images/${FILE_KEY}?ids=${encodeURIComponent(idsParam)}&format=png`;
+    const imgUrl = `https://api.figma.com/v1/images/${FILE_KEY}?ids=${encodeURIComponent(idsParam)}&format=png&scale=${scale}`;
     const imgData = await fetch(imgUrl);
 
     if (imgData.images) {
@@ -285,8 +302,8 @@ async function main() {
   console.log("Imagens decorativas embutidas: " + Object.keys(embeddedImages).length);
 
   const template = {
-    id: "domingo",
-    name: "Domingo",
+    id: TEMPLATE_ID,
+    name: TEMPLATE_NAME,
     version: 2,
     width,
     height,
@@ -298,8 +315,9 @@ async function main() {
     nodeTree,
     embeddedImages: Object.keys(embeddedImages).length > 0 ? embeddedImages : undefined,
   };
+  if (TEMPLATE_ID === "memoria") template.photoGrayscale = true;
 
-  const outPath = path.join(__dirname, "..", "templates", "carousel_domingo.json");
+  const outPath = path.join(__dirname, "..", "templates", `carousel_${TEMPLATE_ID}.json`);
   fs.writeFileSync(outPath, JSON.stringify(template, null, 2), "utf8");
 
   console.log(`Template salvo em: ${outPath}`);

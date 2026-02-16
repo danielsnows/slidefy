@@ -410,26 +410,27 @@ function createExportSlices(
 /**
  * Função principal que cria o carrossel no canvas
  */
+function sendProgress(percent: number, log: string) {
+  figma.ui.postMessage({ type: 'progress', percent, log });
+}
+
 async function createCarouselOnCanvas(message: CreateCarouselMessage) {
   const { templateId, imagesMetadata } = message;
 
-  figma.notify('⏳ Carregando template...', { timeout: 2000 });
+  sendProgress(5, 'Carregando template...');
 
-  // Carrega o template
   const template = await loadTemplate(templateId);
   if (!template) {
     return;
   }
 
-  figma.notify('⏳ Processando imagens...', { timeout: 2000 });
+  sendProgress(20, 'Solicitando imagens...');
 
-  // Solicita as imagens da UI
   figma.ui.postMessage({ 
     type: 'request-images',
     count: imagesMetadata.length 
   });
 
-  // Aguarda as imagens
   const images = await new Promise<Uint8Array[]>((resolve) => {
     const handler = (msg: any) => {
       if (msg.type === 'images-data') {
@@ -441,9 +442,11 @@ async function createCarouselOnCanvas(message: CreateCarouselMessage) {
     figma.ui.onmessage = handler;
   });
 
-  figma.notify('⏳ Criando carrossel...', { timeout: 2000 });
+  sendProgress(45, 'Processando imagens...');
 
   // Cria o frame principal recursivamente
+  sendProgress(55, 'Criando slides...');
+
   const mainFrame = await createNodeFromTemplate(
     template.nodeTree, 
     images,
@@ -455,10 +458,11 @@ async function createCarouselOnCanvas(message: CreateCarouselMessage) {
     return;
   }
 
+  sendProgress(75, 'Adicionando instruções de exportação...');
+
   const gap = 24;
   let instructionsFrame: FrameNode | null = null;
 
-  // Cria o frame de instruções de exportação (acima do template)
   try {
     instructionsFrame = await createExportInstructionsFrame(template.width);
     instructionsFrame.x = 0;
@@ -472,7 +476,8 @@ async function createCarouselOnCanvas(message: CreateCarouselMessage) {
   mainFrame.x = 0;
   mainFrame.y = instructionsFrame ? instructionsFrame.height + gap : 0;
 
-  // Adiciona os slices de exportação ao frame do template (um por slide)
+  sendProgress(90, 'Criando slices de exportação...');
+
   try {
     createExportSlices(
       mainFrame as FrameNode,
@@ -495,6 +500,8 @@ async function createCarouselOnCanvas(message: CreateCarouselMessage) {
   figma.currentPage.selection = toSelect;
   figma.viewport.scrollAndZoomIntoView(toSelect);
 
+  sendProgress(100, 'Carrossel criado com sucesso!');
+  figma.ui.postMessage({ type: 'carousel-complete' });
   figma.notify(`✅ Carrossel "${template.name}" criado com sucesso!`);
 }
 
