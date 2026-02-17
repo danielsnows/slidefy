@@ -21,6 +21,15 @@ const state = {
 };
 ```
 
+## Criação de novos templates
+
+Para adicionar um novo template ao plugin, use o fluxo oficial:
+
+1. **Envie**: link do Figma + descrição detalhada do template + imagem do template inteiro (horizontal, todas as telas).
+2. O agente (ou você) segue a regra em `.cursor/rules/create-template.mdc` e o guia em `docs/CRIACAO-DE-TEMPLATES.md`.
+
+Resumo técnico: registrar em `templates/template-index.json`, gerar `templates/carousel_<id>.json` (via `scripts/fetch-figma-template.js` com token do Figma), salvar a imagem em `images/`, rodar `node build-templates.js`.
+
 ## Próximos passos
 
 - Integrar `createCarousel(templateId, images)` com a Figma Plugin API em `code.ts` ou arquivo equivalente.

@@ -4,13 +4,13 @@
     "name": "Domingo",
     "slides": 7,
     "file": "carousel_domingo.json",
-    "thumbnail": "images/templates/domingo.png"
+    "thumbnail": "images/Template-7 slides.jpg"
   },
   {
     "id": "memoria",
     "name": "Memória",
     "slides": 5,
     "file": "carousel_memoria.json",
-    "thumbnail": "images/templates/memoria.png"
+    "thumbnail": "images/Template-5 slides.jpg"
   }
 ]

@@ -1,0 +1,76 @@
+---
+description: Regra de criação de novos templates no plugin Slidefy
+alwaysApply: false
+globs: templates/**/*.json,scripts/fetch-figma-template.js,build-templates.js
+---
+
+# Criação de novos templates (Slidefy)
+
+Sempre que o usuário for criar um novo template, ele enviará **três coisas**:
+
+1. **Link do Figma** – URL do arquivo/componente do template no Figma  
+2. **Descrição detalhada do template** – nome, quantidade de slides, propósito, particularidades  
+3. **Imagem do template inteiro** – screenshot ou export da arte do template (horizontal, todas as telas)
+
+A partir disso, você deve criar o novo card de template seguindo estes passos.
+
+## Passos obrigatórios
+
+### 1. Extrair dados do link do Figma
+
+- **File key**: no URL `https://www.figma.com/design/FILE_KEY/Nome-do-arquivo` → usar `FILE_KEY`  
+- **Node id**: no query `node-id=72-480` → converter para `72:480` (trocar `-` por `:`)
+
+Exemplo:  
+`https://www.figma.com/design/UDzhTKaSCrvIx5vorilDEO/Slidefy?node-id=72-480`  
+→ fileKey = `UDzhTKaSCrvIx5vorilDEO`, nodeId = `72:480`
+
+### 2. Usar a descrição para definir id, name e slides
+
+- **id**: slug em minúsculas, sem espaços (ex.: `domingo`, `memoria`, `evento-ig`)  
+- **name**: nome de exibição (ex.: "Domingo", "Memórias")  
+- **slides**: número de slides do template (ex.: 3, 5, 7)
+
+### 3. Salvar a imagem do template
+
+- Colocar a imagem em `images/` com nome claro, ex.: `Template-N slides.jpg` ou `images/<id>-template.jpg`  
+- Usar o caminho relativo ao root do projeto (ex.: `images/Template-7 slides.jpg`)
+
+### 4. Gerar o JSON do carrossel (Figma API)
+
+- Usar o script: `scripts/fetch-figma-template.js`  
+- Uso: `FIGMA_ACCESS_TOKEN=xxx node scripts/fetch-figma-template.js [fileKey] [nodeId] [templateId] [templateName]`  
+- O token é obtido em Figma → Settings → Personal access tokens  
+- O script gera `templates/carousel_<id>.json`. Se o usuário não tiver token, orientar a rodar o script manualmente após obter o token.
+
+### 5. Registrar no índice de templates
+
+- Editar `templates/template-index.json`  
+- Adicionar um objeto com: `id`, `name`, `slides`, `file` (ex.: `"carousel_<id>.json"`), `thumbnail` (caminho da imagem em `images/`)
+
+Exemplo de entrada:
+
+```json
+{
+  "id": "evento-ig",
+  "name": "Evento IG",
+  "slides": 5,
+  "file": "carousel_evento-ig.json",
+  "thumbnail": "images/Template-5 slides.jpg"
+}
+```
+
+### 6. Rodar o build
+
+- Executar: `node build-templates.js`  
+- Isso atualiza `code.js` (EMBEDDED_TEMPLATES) e `ui.html` (lista de templates com thumbnails embutidos)
+
+## Resumo
+
+| Entrada do usuário | Uso |
+|--------------------|-----|
+| Link Figma         | fileKey + nodeId para `fetch-figma-template.js` |
+| Descrição          | id, name, slides para índice e script |
+| Imagem             | Salvar em `images/` e usar em `thumbnail` |
+
+Não alterar a estrutura dos templates existentes nem o fluxo de outras telas do plugin; apenas adicionar o novo item no índice, o novo JSON em `templates/` e a nova imagem em `images/`.

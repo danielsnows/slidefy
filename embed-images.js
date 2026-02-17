@@ -9,7 +9,7 @@ const path = require('path');
 const imagesDir = path.join(__dirname, 'images');
 const htmlPath = path.join(__dirname, 'ui.html');
 
-const files = ['photo-icon.png', 'check-final.png', 'figma-logo.png', 'logo.svg', 'ArrowLeft.svg', 'ArrowRight.svg'];
+const files = ['photo-icon.png', 'check-final.png', 'figma-logo.png', 'logo.svg', 'ArrowLeft.svg', 'ArrowRight.svg', 'ig-card-icons.png'];
 const data = {};
 files.forEach((f) => {
   const filePath = path.join(imagesDir, f);
@@ -26,6 +26,7 @@ html = html.replace(/src="images\/figma-logo\.png"/g, `src="${data['figma-logo.p
 html = html.replace(/src="images\/logo\.svg"/g, `src="${data['logo.svg']}"`);
 html = html.replace(/src="images\/ArrowLeft\.svg"/g, `src="${data['ArrowLeft.svg']}"`);
 html = html.replace(/src="images\/ArrowRight\.svg"/g, `src="${data['ArrowRight.svg']}"`);
+html = html.replace(/src="images\/ig-card-icons\.png"/g, `src="${data['ig-card-icons.png']}"`);
 
 fs.writeFileSync(htmlPath, html);
 console.log('Imagens embutidas em ui.html');
