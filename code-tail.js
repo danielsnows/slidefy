@@ -1,4 +1,6 @@
 // ========== HANDLER E LÓGICA DE CRIAÇÃO (anexado após EMBEDDED_TEMPLATES) ==========
+// ATENÇÃO: Se existir code-source.js, o build usa ELE como fonte única e ignora este arquivo.
+// Edite code-source.js para alterar a lógica do plugin; code-tail.js é legado/fallback.
 // Frame de instruções conforme design Figma: Slidefy - UI Design, node 57-94
 
 var INSTRUCTION_STEPS = [
@@ -66,6 +68,7 @@ async function createExportInstructionsFrame(templateWidth) {
   frame.clipsContent = false;
 
   var titleText = figma.createText();
+  titleText.name = 'Title';
   await figma.loadFontAsync(instrumentSans);
   titleText.fontName = instrumentSans;
   titleText.fontSize = 60;
@@ -77,7 +80,7 @@ async function createExportInstructionsFrame(templateWidth) {
 
   // Steps: horizontal, Fill container (width), Hug contents (height), itemSpacing 0
   var stepsContainer = figma.createFrame();
-  stepsContainer.name = 'Steps';
+  stepsContainer.name = 'Content';
   stepsContainer.layoutMode = 'HORIZONTAL';
   stepsContainer.primaryAxisAlignItems = 'MIN';
   stepsContainer.counterAxisAlignItems = 'CENTER';
@@ -244,6 +247,13 @@ async function loadFont(fontName) {
       return alt;
     } catch (e2) {}
   }
+  if (fontName.family === 'Bayon' || fontName.family === 'Fustat') {
+    try {
+      var altStyle = { family: fontName.family, style: 'Regular' };
+      await figma.loadFontAsync(altStyle);
+      return altStyle;
+    } catch (e2) {}
+  }
   console.warn('Fonte não encontrada: ' + fontName.family + ' ' + fontName.style + ', usando padrão');
   await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
   return { family: 'Inter', style: 'Regular' };
@@ -267,6 +277,10 @@ async function createNodeFromTemplate(nodeData, userImages, photoLayerPrefix, em
       node.name = nodeData.name;
       if (nodeData.width !== undefined && nodeData.height !== undefined) node.resize(nodeData.width, nodeData.height);
       if (nodeData.cornerRadius !== undefined) node.cornerRadius = nodeData.cornerRadius;
+      if (nodeData.topLeftRadius !== undefined) node.topLeftRadius = nodeData.topLeftRadius;
+      if (nodeData.topRightRadius !== undefined) node.topRightRadius = nodeData.topRightRadius;
+      if (nodeData.bottomLeftRadius !== undefined) node.bottomLeftRadius = nodeData.bottomLeftRadius;
+      if (nodeData.bottomRightRadius !== undefined) node.bottomRightRadius = nodeData.bottomRightRadius;
       break;
     case 'TEXT':
       var textNode = figma.createText();
@@ -304,6 +318,8 @@ async function createNodeFromTemplate(nodeData, userImages, photoLayerPrefix, em
           }
         }
         if (nodeData.textCase) textNode.textCase = nodeData.textCase;
+        if (nodeData.width != null && nodeData.height != null) textNode.resize(nodeData.width, nodeData.height);
+        if (textNode.leadingTrim !== undefined) textNode.leadingTrim = { type: 'CAP_HEIGHT' };
       } catch (textErr) {
         console.warn('Erro ao aplicar estilo de texto em "' + (nodeData.name || '') + '":', textErr);
       }
@@ -437,6 +453,65 @@ async function createNodeFromTemplate(nodeData, userImages, photoLayerPrefix, em
   return node;
 }
 
+var CULTO_JOVEM_MAIN_POSITIONS = { 'Culto': { x: 70, y: 68 }, 'Jo': { x: 20, y: 198 }, 'VEM': { x: 189, y: 533 } };
+var CULTO_JOVEM_DATE_POSITION = { x: 812, y: 296 };
+var CULTO_JOVEM_JUVENTUDE_POSITIONS = [
+  { x: 0, y: 0 }, { x: 336, y: 176 }, { x: 672, y: 352 }, { x: 1008, y: 528 },
+  { x: 1344, y: 704 }, { x: 1680, y: 880 }, { x: 2016, y: 1057 }
+];
+var JUVENTUDE_ROTATION_RAD = -Math.PI / 2;
+
+function applyCultoJovemTypography(root) {
+  function collectTexts(node, out) {
+    if (node.type === 'TEXT') out.push(node);
+    if (node.children) {
+      for (var i = 0; i < node.children.length; i++) collectTexts(node.children[i], out);
+    }
+  }
+  var allTexts = [];
+  collectTexts(root, allTexts);
+
+  var mainFrame = root.findOne(function (n) { return n.type === 'FRAME' && n.name === 'Main'; });
+  if (mainFrame && mainFrame.children) {
+    for (var m = 0; m < mainFrame.children.length; m++) {
+      var child = mainFrame.children[m];
+      if (child.type !== 'TEXT') continue;
+      var chars = child.characters ? child.characters.trim() : '';
+      var pos = CULTO_JOVEM_MAIN_POSITIONS[chars];
+      if (pos) {
+        child.x = pos.x;
+        child.y = pos.y;
+      }
+      if (chars === 'VEM' && child.strokes && child.strokes.length > 0) child.fills = [];
+    }
+  }
+
+  var dateNode = root.findOne(function (n) { return n.type === 'TEXT' && n.name === 'Date'; });
+  if (dateNode) {
+    dateNode.x = CULTO_JOVEM_DATE_POSITION.x;
+    dateNode.y = CULTO_JOVEM_DATE_POSITION.y;
+  }
+
+  var container = root.findOne(function (n) { return n.type === 'GROUP' && n.name === 'Container'; });
+  if (container && container.children) {
+    var juventudeTexts = [];
+    for (var j = 0; j < container.children.length; j++) {
+      var c = container.children[j];
+      if (c.type === 'TEXT' && c.characters === 'JUVENTUDE') juventudeTexts.push(c);
+    }
+    juventudeTexts.sort(function (a, b) { return a.y - b.y || a.x - b.x; });
+    for (var k = 0; k < juventudeTexts.length && k < CULTO_JOVEM_JUVENTUDE_POSITIONS.length; k++) {
+      var t = juventudeTexts[k];
+      var pos = CULTO_JOVEM_JUVENTUDE_POSITIONS[k];
+      t.x = pos.x;
+      t.y = pos.y;
+      t.rotation = JUVENTUDE_ROTATION_RAD;
+    }
+    container.x = 2176;
+    container.y = -114;
+  }
+}
+
 function base64ToUint8Array(base64) {
   var B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
   var len = base64.length;
@@ -508,6 +583,9 @@ async function createCarouselOnCanvas(msg) {
   if (!mainFrame) {
     figma.notify('Erro ao criar carrossel', { error: true });
     return;
+  }
+  if (templateId === 'culto-jovem' && mainFrame.type === 'FRAME') {
+    applyCultoJovemTypography(mainFrame);
   }
 
   sendProgress(75, 'Adicionando instruções de exportação...');

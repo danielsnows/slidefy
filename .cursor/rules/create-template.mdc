@@ -62,8 +62,8 @@ Exemplo de entrada:
 
 ### 6. Rodar o build
 
-- Executar: `node build-templates.js`  
-- Isso atualiza `code.js` (EMBEDDED_TEMPLATES) e `ui.html` (lista de templates com thumbnails embutidos)
+- Executar: `npm run build` ou `node build-templates.js`  
+- Se existir `code-source.js`, o build usa ele como fonte e gera `code.js` (EMBEDDED_TEMPLATES + lógica). Também atualiza `ui.html` (lista de templates com thumbnails).
 
 ## Resumo
 
@@ -73,4 +73,4 @@ Exemplo de entrada:
 | Descrição          | id, name, slides para índice e script |
 | Imagem             | Salvar em `images/` e usar em `thumbnail` |
 
-Não alterar a estrutura dos templates existentes nem o fluxo de outras telas do plugin; apenas adicionar o novo item no índice, o novo JSON em `templates/` e a nova imagem em `images/`.
+Não alterar a estrutura dos templates existentes nem o fluxo de outras telas do plugin; apenas adicionar o novo item no índice, o novo JSON em `templates/` e a nova imagem em `images/`. Para alterações na **lógica do plugin** (criação de nós, tipografia, etc.), editar **`code-source.js`** e rodar o build — esse arquivo é a fonte única que gera `code.js`.

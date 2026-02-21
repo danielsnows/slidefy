@@ -192,6 +192,10 @@ async function createNodeFromTemplate(
       if (nodeData.width !== undefined && nodeData.height !== undefined) {
         textNode.resize(nodeData.width, nodeData.height);
       }
+      // Vertical trim: "Cap height to baseline" (remove espaço vertical acima/abaixo dos glifos)
+      if ('leadingTrim' in textNode) {
+        (textNode as any).leadingTrim = { type: 'CAP_HEIGHT' };
+      }
       break;
 
     case 'SLICE':
@@ -354,6 +358,79 @@ async function createNodeFromTemplate(
   return node;
 }
 
+/** Posições tipográficas fixas para o template Culto Jovem (dentro do frame principal) */
+const CULTO_JOVEM_MAIN_TEXT_POSITIONS: Record<string, { x: number; y: number }> = {
+  'Culto': { x: 70, y: 68 },
+  'Jo': { x: 20, y: 198 },
+  'VEM': { x: 189, y: 533 },
+};
+const CULTO_JOVEM_DATE_POSITION = { x: 812, y: 296 };
+/** Posições dos 7 textos JUVENTUDE (relativas ao grupo Container em 2176, -114): rotation -90° */
+const CULTO_JOVEM_JUVENTUDE_POSITIONS = [
+  { x: 0, y: 0 },
+  { x: 336, y: 176 },
+  { x: 672, y: 352 },
+  { x: 1008, y: 528 },
+  { x: 1344, y: 704 },
+  { x: 1680, y: 880 },
+  { x: 2016, y: 1057 },
+];
+const JUVENTUDE_ROTATION_RAD = -Math.PI / 2; // -90°
+
+function applyCultoJovemTypography(root: FrameNode): void {
+  const collectTexts = (node: SceneNode, out: TextNode[]): void => {
+    if (node.type === 'TEXT') out.push(node);
+    if ('children' in node) {
+      for (const c of node.children) collectTexts(c, out);
+    }
+  };
+  const allTexts: TextNode[] = [];
+  collectTexts(root, allTexts);
+
+  // Frame "Main" está como filho do root
+  const mainFrame = root.findOne((n) => n.type === 'FRAME' && n.name === 'Main') as FrameNode | null;
+  if (mainFrame) {
+    for (const child of mainFrame.children) {
+      if (child.type !== 'TEXT') continue;
+      const chars = (child as TextNode).characters.trim();
+      const pos = CULTO_JOVEM_MAIN_TEXT_POSITIONS[chars];
+      if (pos) {
+        child.x = pos.x;
+        child.y = pos.y;
+      }
+      // VEM com apenas stroke (border): sem fill
+      if (chars === 'VEM' && (child as TextNode).strokes && (child as TextNode).strokes.length > 0) {
+        (child as TextNode).fills = [];
+      }
+    }
+  }
+
+  // Date é filho direto do root
+  const dateNode = root.findOne((n) => n.type === 'TEXT' && n.name === 'Date') as TextNode | null;
+  if (dateNode) {
+    dateNode.x = CULTO_JOVEM_DATE_POSITION.x;
+    dateNode.y = CULTO_JOVEM_DATE_POSITION.y;
+  }
+
+  // Container com 7 JUVENTUDE: rotation -90° e posições fixas
+  const container = root.findOne((n) => n.type === 'GROUP' && n.name === 'Container');
+  if (container && 'children' in container) {
+    const juventudeTexts = container.children.filter(
+      (c): c is TextNode => c.type === 'TEXT' && (c as TextNode).characters === 'JUVENTUDE'
+    );
+    juventudeTexts.sort((a, b) => a.y - b.y || a.x - b.x);
+    for (let i = 0; i < juventudeTexts.length && i < CULTO_JOVEM_JUVENTUDE_POSITIONS.length; i++) {
+      const t = juventudeTexts[i];
+      const pos = CULTO_JOVEM_JUVENTUDE_POSITIONS[i];
+      t.x = pos.x;
+      t.y = pos.y;
+      t.rotation = JUVENTUDE_ROTATION_RAD;
+    }
+    container.x = 2176;
+    container.y = -114;
+  }
+}
+
 /** Texto exibido no frame de instruções de exportação */
 const EXPORT_INSTRUCTIONS_TEXT =
   "Como exportar os slides:\n\n" +
@@ -456,6 +533,10 @@ async function createCarouselOnCanvas(message: CreateCarouselMessage) {
   if (!mainFrame) {
     figma.notify('❌ Erro ao criar carrossel', { error: true });
     return;
+  }
+
+  if (templateId === 'culto-jovem' && mainFrame.type === 'FRAME') {
+    applyCultoJovemTypography(mainFrame);
   }
 
   sendProgress(75, 'Adicionando instruções de exportação...');

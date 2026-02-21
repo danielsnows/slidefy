@@ -12,5 +12,12 @@
     "slides": 5,
     "file": "carousel_memoria.json",
     "thumbnail": "images/Template-5 slides.jpg"
+  },
+  {
+    "id": "culto-jovem",
+    "name": "Culto Jovem",
+    "slides": 4,
+    "file": "carousel_culto-jovem.json",
+    "thumbnail": "images/Template-Culto Jovem.png"
   }
 ]
