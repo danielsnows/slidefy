@@ -179,12 +179,20 @@ function collectImageRefs(node, refs = new Set(), photoPrefix = "photo-") {
   return refs;
 }
 
+const DECORATIVE_FRAME_NAMES = ["decorative-1", "decorative-2"];
+
 /**
- * Coleta ids de nós que têm fill IMAGE (para export)
+ * Coleta ids de nós que têm fill IMAGE (para export).
+ * Se options.skipFrameNames estiver definido, não recursa em FRAMEs com esse nome (exporta o frame inteiro à parte).
  */
-function collectImageNodeIds(node, ids = [], photoPrefix = "photo-") {
+function collectImageNodeIds(node, ids = [], photoPrefix = "photo-", options = {}) {
   const name = (node.name || "").toString();
   const isPhoto = name.toLowerCase().startsWith(photoPrefix);
+  const skipFrameNames = options.skipFrameNames || [];
+
+  if (node.type === "FRAME" && skipFrameNames.includes(name)) {
+    return ids;
+  }
 
   if (node.fills) {
     for (const f of node.fills) {
@@ -196,10 +204,140 @@ function collectImageNodeIds(node, ids = [], photoPrefix = "photo-") {
   }
 
   if (node.children) {
-    for (const c of node.children) collectImageNodeIds(c, ids, photoPrefix);
+    for (const c of node.children) collectImageNodeIds(c, ids, photoPrefix, options);
   }
 
   return ids;
+}
+
+/**
+ * Encontra nós na árvore (API) cujo name está em names.
+ */
+function findNodesByName(node, names, out = []) {
+  if (names.includes((node.name || "").toString())) out.push(node);
+  if (node.children) {
+    for (const c of node.children) findNodesByName(c, names, out);
+  }
+  return out;
+}
+
+/**
+ * Substitui no nodeTree (serializado) os FRAMEs decorative-1 e decorative-2 por RECTANGLEs com fill IMAGE.
+ * Os TEXT filhos de decorative-2 (ex.: FOI, POR, VOCÊ) são extraídos e adicionados ao root para não se perderem.
+ */
+function replaceDecorativeFramesInTree(node, root) {
+  if (!node.children) return;
+  const targetRoot = root || node;
+  for (let i = 0; i < node.children.length; i++) {
+    const c = node.children[i];
+    if (c.type === "FRAME" && DECORATIVE_FRAME_NAMES.includes(c.name)) {
+      const isDec2 = c.name === "decorative-2";
+      const textChildren = (c.children || []).filter((ch) => ch.type === "TEXT");
+      const x = c.name === "decorative-1" ? 0 : 3381;
+      const y = 0;
+      node.children[i] = {
+        id: c.id,
+        type: "RECTANGLE",
+        name: c.name,
+        x,
+        y,
+        width: c.width,
+        height: c.height,
+        visible: true,
+        locked: false,
+        opacity: 1,
+        rotation: 0,
+        blendMode: "PASS_THROUGH",
+        fills: [{ type: "IMAGE", scaleMode: "FILL" }],
+      };
+      if (isDec2 && textChildren.length > 0 && targetRoot.children) {
+        for (const textNode of textChildren) {
+          targetRoot.children.push(textNode);
+        }
+      }
+    } else if (c.children && c.children.length > 0) {
+      replaceDecorativeFramesInTree(c, targetRoot);
+    }
+  }
+}
+
+/** Converte #hex para { r, g, b } em 0..1 */
+function hexToFigmaColor(hex) {
+  const n = parseInt(hex.replace(/^#/, ""), 16);
+  return {
+    r: ((n >> 16) & 0xff) / 255,
+    g: ((n >> 8) & 0xff) / 255,
+    b: (n & 0xff) / 255,
+    a: 1,
+  };
+}
+
+/**
+ * Patch do template Páscoa: posições e tipografia conforme spec.
+ */
+function applyPascoaPatch(node) {
+  const color824133 = hexToFigmaColor("#824133");
+  const colorDA7A66 = hexToFigmaColor("#DA7A66");
+  const photoPositions = {
+    "photo-1": { x: 1116, y: 130 },
+    "photo-2": { x: 1809, y: 90 },
+    "photo-3": { x: 2080, y: 450 },
+    "photo-4": { x: 2585, y: 30 },
+    "photo-5": { x: 3310, y: 30 },
+  };
+  const fraseText = "Ele decidiu morrer por você para não viver sem você!";
+
+  function walk(n) {
+    if (!n) return;
+    const name = (n.name || "").toString();
+    const chars = (n.characters || "").toString().trim();
+
+    if (photoPositions[name]) {
+      n.x = photoPositions[name].x;
+      n.y = photoPositions[name].y;
+    }
+
+    if (n.type === "TEXT") {
+      if (chars.includes("Ele decidiu morrer") || chars === fraseText) {
+        n.x = 1623;
+        n.y = 428;
+        n.width = 385;
+        n.fontName = { family: "Nothing You Could Do", style: "Regular" };
+        n.fontSize = 81;
+        n.lineHeight = 81;
+        n.letterSpacing = { unit: "PERCENT", value: -8 };
+        n.textAutoResize = "HEIGHT";
+        n.fills = [{ type: "SOLID", color: color824133, opacity: 1 }];
+      } else if (chars.trim().toUpperCase() === "FOI") {
+        n.x = 4528;
+        n.y = 166;
+        n.fontName = { family: "Metamorphous", style: "Regular" };
+        n.fontSize = 320;
+        n.letterSpacing = { unit: "PERCENT", value: -12 };
+        n.textCase = "UPPER";
+        n.fills = [{ type: "SOLID", color: color824133, opacity: 1 }];
+      } else if (chars.trim().toUpperCase() === "POR") {
+        n.x = 4528;
+        n.y = 419;
+        n.fontName = { family: "Metamorphous", style: "Regular" };
+        n.fontSize = 320;
+        n.letterSpacing = { unit: "PERCENT", value: -12 };
+        n.textCase = "UPPER";
+        n.fills = [{ type: "SOLID", color: color824133, opacity: 1 }];
+      } else if (chars.trim().toUpperCase() === "VOCÊ" || (chars.trim().toUpperCase().indexOf("VOC") >= 0 && chars.trim().length <= 6)) {
+        n.x = 4481;
+        n.y = 500;
+        n.fontName = { family: "Nothing You Could Do", style: "Regular" };
+        n.fontSize = 480;
+        n.letterSpacing = { unit: "PERCENT", value: -10 };
+        n.fills = [{ type: "SOLID", color: colorDA7A66, opacity: 1 }];
+      }
+    }
+
+    if (n.children) for (const c of n.children) walk(c);
+  }
+
+  walk(node);
 }
 
 function findNodeById(obj, id) {
@@ -272,13 +410,20 @@ async function main() {
   console.log(`Camadas photo-*: ${photoCount}`);
   console.log(`Camadas Slice: ${sliceCount}`);
 
-  // Exportar imagens decorativas via Figma Images API (em lotes de 50)
-  const imageNodeIds = [...new Set(collectImageNodeIds(node))];
+  // Frames decorative-1 e decorative-2: exportar cada um como uma única imagem (não exportar filhos)
+  const decorativeFrames = findNodesByName(node, DECORATIVE_FRAME_NAMES);
+  const decorativeFrameIds = decorativeFrames.map((n) => n.id);
+  const imageNodeIds = [
+    ...new Set(
+      collectImageNodeIds(node, [], photoPrefix, { skipFrameNames: DECORATIVE_FRAME_NAMES })
+    ),
+  ];
+
   const embeddedImages = {};
   const BATCH_SIZE = 50;
-
-  // scale=0.5 para caber no limite do Figma createImage (~4096px por lado)
   const scale = TEMPLATE_ID === "memoria" ? 0.5 : 1;
+
+  // Exportar imagens decorativas (nós com fill IMAGE, exceto dentro de decorative-1/2)
   for (let i = 0; i < imageNodeIds.length; i += BATCH_SIZE) {
     const batch = imageNodeIds.slice(i, i + BATCH_SIZE);
     const idsParam = batch.join(",");
@@ -299,7 +444,29 @@ async function main() {
     }
   }
 
+  // Exportar cada frame decorative-1 e decorative-2 como uma única imagem.
+  // A API do Figma exporta o frame como renderizado; "Clip content" ativado no frame é respeitado na exportação.
+  for (const frameId of decorativeFrameIds) {
+    try {
+      const imgUrl = `https://api.figma.com/v1/images/${FILE_KEY}?ids=${encodeURIComponent(frameId)}&format=png&scale=${scale}`;
+      const imgData = await fetch(imgUrl);
+      if (imgData.images && imgData.images[frameId]) {
+        const b64 = await fetchImage(imgData.images[frameId]);
+        embeddedImages[frameId] = b64;
+      }
+    } catch (e) {
+      console.warn("Falha ao baixar frame decorativo " + frameId + ":", e.message);
+    }
+  }
+
   console.log("Imagens decorativas embutidas: " + Object.keys(embeddedImages).length);
+
+  // Substituir no nodeTree os FRAMEs decorative-1/2 por RECTANGLEs com fill IMAGE
+  replaceDecorativeFramesInTree(nodeTree, nodeTree);
+
+  if (TEMPLATE_ID === "pascoa") {
+    applyPascoaPatch(nodeTree);
+  }
 
   const template = {
     id: TEMPLATE_ID,

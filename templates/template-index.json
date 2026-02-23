@@ -1,23 +1,6 @@
 [
-  {
-    "id": "domingo",
-    "name": "Domingo",
-    "slides": 7,
-    "file": "carousel_domingo.json",
-    "thumbnail": "images/Template-7 slides.jpg"
-  },
-  {
-    "id": "memoria",
-    "name": "Memória",
-    "slides": 5,
-    "file": "carousel_memoria.json",
-    "thumbnail": "images/Template-5 slides.jpg"
-  },
-  {
-    "id": "culto-jovem",
-    "name": "Culto Jovem",
-    "slides": 4,
-    "file": "carousel_culto-jovem.json",
-    "thumbnail": "images/Template-Culto Jovem.png"
-  }
+  {"id":"domingo","name":"Domingo","slides":7,"file":"carousel_domingo.json","thumbnail":"images/Template-7 slides.jpg"},
+  {"id":"memoria","name":"Memória","slides":5,"file":"carousel_memoria.json","thumbnail":"images/Template-5 slides.jpg"},
+  {"id":"culto-jovem","name":"Culto Jovem","slides":4,"file":"carousel_culto-jovem.json","thumbnail":"images/Template-Culto Jovem.png"},
+  {"id":"pascoa","name":"Páscoa","slides":5,"file":"carousel_pascoa.json","thumbnail":"images/Template-Pascoa.png"}
 ]

@@ -34,7 +34,9 @@ const GOOGLE_FONTS = [
   { family: "Instrument Sans", style: "SemiBold" },
   { family: "Instrument Sans", style: "Bold" },
   { family: "Bayon", style: "Regular" },
-  { family: "Fustat", style: "Regular" }
+  { family: "Fustat", style: "Regular" },
+  { family: "Nothing You Could Do", style: "Regular" },
+  { family: "Metamorphous", style: "Regular" }
 ];
 
 async function preloadGoogleFonts() {
@@ -304,6 +306,18 @@ async function loadFont(fontName) {
       return altStyle;
     } catch (e2) {}
   }
+  if (fontName.family === 'Nothing You Could Do' || fontName.family === 'Metamorphous') {
+    var variants = [{ family: fontName.family, style: 'Regular' }];
+    if (fontName.family === 'Nothing You Could Do') {
+      variants.push({ family: 'Nothing you could do', style: 'Regular' });
+    }
+    for (var v = 0; v < variants.length; v++) {
+      try {
+        await figma.loadFontAsync(variants[v]);
+        return variants[v];
+      } catch (e2) {}
+    }
+  }
   console.warn('Fonte não encontrada: ' + fontName.family + ' ' + fontName.style + ', usando padrão');
   await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
   return { family: 'Inter', style: 'Regular' };
@@ -340,7 +354,7 @@ async function createNodeFromTemplate(nodeData, userImages, photoLayerPrefix, em
         if (nodeData.fontName && typeof nodeData.fontName === 'object' && nodeData.fontName.family) {
           var loadedFont = await loadFont(nodeData.fontName);
           var fontToUse = (loadedFont && loadedFont.family) ? loadedFont : nodeData.fontName;
-          textNode.fontName = { family: fontToUse.family, style: fontToUse.style || 'Regular' };
+          textNode.fontName = { family: fontToUse.family, style: fontToUse.style !== undefined && fontToUse.style !== null ? fontToUse.style : 'Regular' };
         } else {
           await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
           textNode.fontName = { family: 'Inter', style: 'Regular' };
@@ -360,7 +374,7 @@ async function createNodeFromTemplate(nodeData, userImages, photoLayerPrefix, em
         if (nodeData.lineHeight != null) {
           var lh = nodeData.lineHeight;
           if (typeof lh === 'number') {
-            textNode.lineHeight = lh;
+            textNode.lineHeight = { unit: 'PIXELS', value: lh };
           } else if (lh && typeof lh === 'object' && typeof lh.value === 'number' && (lh.unit === 'PIXELS' || lh.unit === 'PERCENT')) {
             textNode.lineHeight = { unit: lh.unit, value: lh.value };
           } else if (lh && typeof lh === 'object' && lh.unit === 'AUTO') {
@@ -368,9 +382,17 @@ async function createNodeFromTemplate(nodeData, userImages, photoLayerPrefix, em
           }
         }
         if (nodeData.textCase) textNode.textCase = nodeData.textCase;
-        textNode.textAutoResize = 'WIDTH_AND_HEIGHT';
+        if (nodeData.width != null && (nodeData.textAutoResize === 'HEIGHT' || nodeData.textAutoResize === 'NONE')) {
+          var w = Number(nodeData.width);
+          textNode.resize(w, 800);
+        }
+        if (nodeData.textAutoResize && ['NONE', 'WIDTH', 'HEIGHT', 'WIDTH_AND_HEIGHT'].indexOf(nodeData.textAutoResize) >= 0) {
+          textNode.textAutoResize = nodeData.textAutoResize;
+        } else {
+          textNode.textAutoResize = 'WIDTH_AND_HEIGHT';
+        }
       } catch (textErr) {
-        console.warn('Erro ao aplicar estilo de texto em "' + (nodeData.name || '') + '":', textErr);
+        console.warn('Erro ao aplicar estilo de texto em "' + (nodeData.name || '') + '":', (textErr && textErr.message) || textErr);
       }
       break;
     case 'SLICE':
@@ -582,6 +604,74 @@ function applyCultoJovemTypography(root) {
   }
 }
 
+var PASCOA_COLOR_824133 = { r: 130 / 255, g: 65 / 255, b: 51 / 255 };
+var PASCOA_COLOR_DA7A66 = { r: 218 / 255, g: 122 / 255, b: 102 / 255 };
+
+function pascoaMatch(node, content, name) {
+  var raw = (node.characters || '').trim();
+  var n = (node.name || '').trim();
+  if (content && raw.toUpperCase() === content.toUpperCase()) return true;
+  if (name && n.toUpperCase() === name.toUpperCase()) return true;
+  if (content && raw.length <= (content.length + 2) && raw.toUpperCase().indexOf(content.toUpperCase()) >= 0) return true;
+  return false;
+}
+
+async function applyPascoaOverrides(root) {
+  function collectTexts(node, out) {
+    if (node.type === 'TEXT') out.push(node);
+    if (node.children) {
+      for (var i = 0; i < node.children.length; i++) collectTexts(node.children[i], out);
+    }
+  }
+  var texts = [];
+  collectTexts(root, texts);
+  var fontNothing = { family: 'Nothing You Could Do', style: 'Regular' };
+  var fontMeta = { family: 'Metamorphous', style: 'Regular' };
+  try {
+    await figma.loadFontAsync(fontNothing);
+    await figma.loadFontAsync(fontMeta);
+  } catch (e) {
+    return;
+  }
+  for (var i = 0; i < texts.length; i++) {
+    var t = texts[i];
+    var raw = t.characters || '';
+    try {
+      if (raw.indexOf('Ele decidiu morrer') >= 0) {
+        await figma.loadFontAsync(fontNothing);
+        t.fontName = fontNothing;
+        t.fontSize = 81;
+        t.lineHeight = { unit: 'PIXELS', value: 81 };
+        t.letterSpacing = { unit: 'PERCENT', value: -8 };
+        t.fills = [{ type: 'SOLID', color: PASCOA_COLOR_824133, opacity: 1 }];
+      } else if (pascoaMatch(t, 'FOI', 'FOI')) {
+        await figma.loadFontAsync(fontMeta);
+        t.fontName = fontMeta;
+        t.fontSize = 320;
+        t.letterSpacing = { unit: 'PERCENT', value: -12 };
+        t.textCase = 'UPPER';
+        t.fills = [{ type: 'SOLID', color: PASCOA_COLOR_824133, opacity: 1 }];
+      } else if (pascoaMatch(t, 'POR', 'POR')) {
+        await figma.loadFontAsync(fontMeta);
+        t.fontName = fontMeta;
+        t.fontSize = 320;
+        t.y = t.y + 270;
+        t.letterSpacing = { unit: 'PERCENT', value: -12 };
+        t.textCase = 'UPPER';
+        t.fills = [{ type: 'SOLID', color: PASCOA_COLOR_824133, opacity: 1 }];
+      } else if (pascoaMatch(t, 'VOCÊ', 'VOCÊ') || (raw.trim().toUpperCase().indexOf('VOC') >= 0 && raw.trim().length <= 6)) {
+        await figma.loadFontAsync(fontNothing);
+        t.fontName = fontNothing;
+        t.fontSize = 480;
+        t.letterSpacing = { unit: 'PERCENT', value: -10 };
+        t.fills = [{ type: 'SOLID', color: PASCOA_COLOR_DA7A66, opacity: 1 }];
+      }
+    } catch (err) {
+      console.warn('Pascoa override em "' + (t.name || t.characters) + '":', err && err.message);
+    }
+  }
+}
+
 function base64ToUint8Array(base64) {
   var B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
   var len = base64.length;
@@ -656,6 +746,9 @@ async function createCarouselOnCanvas(msg) {
   }
   if (templateId === 'culto-jovem' && mainFrame.type === 'FRAME') {
     applyCultoJovemTypography(mainFrame);
+  }
+  if (templateId === 'pascoa' && mainFrame) {
+    await applyPascoaOverrides(mainFrame);
   }
 
   sendProgress(75, 'Adicionando instruções de exportação...');

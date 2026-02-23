@@ -1,0 +1,88 @@
+---
+description: Guideline de fontes Google e armadilhas na implementação de templates (Slidefy)
+alwaysApply: false
+globs: code-source.js,scripts/fetch-figma-template.js,templates/**/*.json
+---
+
+# Fontes Google e armadilhas na implementação de templates (Slidefy)
+
+Use esta guideline ao adicionar ou ajustar templates que usam **Google Fonts**, para evitar os problemas recorrentes vistos no template Páscoa e em outros.
+
+---
+
+## 1. Registrar e carregar fontes
+
+- **Sempre** adicionar as novas fontes ao array `GOOGLE_FONTS` em `code-source.js` com o nome exato do Google Fonts (ex.: `"Nothing You Could Do"`, `"Metamorphous"`).
+- Usar **apenas** `style: "Regular"` no preload. Não usar `style: ""` — o Figma costuma rejeitar e gerar aviso "The font \"...\" could not be loaded".
+- No `loadFont`, incluir fallback para as novas famílias: tentar `{ family: "...", style: 'Regular' }` e, se a família tiver grafia alternativa (ex.: "Nothing you could do"), tentar também essa variante com `style: 'Regular'`.
+
+---
+
+## 2. lineHeight no plugin (Figma API)
+
+- O Figma **exige** `lineHeight` como **objeto**, não como número.
+- Em `createNodeFromTemplate` (case TEXT), ao receber `nodeData.lineHeight` numérico, converter antes de atribuir:
+  - `textNode.lineHeight = { unit: 'PIXELS', value: lh };`
+- Erro típico no console: `Property "lineHeight" failed validation: Expected object, received number`.
+
+---
+
+## 3. textAutoResize e resize (altura automática)
+
+- Para texto com **largura fixa e altura automática** (ex.: frase com width 385px e auto height):
+  - **Ordem obrigatória:** primeiro `resize(largura, alturaInicial)` (ex.: 385, 800), **depois** `textNode.textAutoResize = 'HEIGHT'`.
+  - **Nunca** chamar `resize()` **depois** de definir `textAutoResize = 'HEIGHT'` — a API do Figma redefine auto-resize para `NONE` quando se usa `resize()` depois.
+- No JSON do template, usar `textAutoResize: "HEIGHT"` e `width: 385` (ou o valor desejado). O plugin já aplica essa ordem.
+
+---
+
+## 4. Correspondência de textos (conteúdo vindo do Figma)
+
+- O Figma pode serializar texto com **capitalização diferente** do esperado (ex.: `"Foi"` e `"Por"` em vez de `"FOI"` e `"POR"`).
+- Em **overrides pós-criação** (ex.: `applyPascoaOverrides`) e no **patch do fetch script**:
+  - Comparar **sempre** de forma **case-insensitive**: `chars.trim().toUpperCase() === "FOI"` ou função `pascoaMatch(node, 'FOI', 'FOI')` que usa `raw.toUpperCase() === content.toUpperCase()` e `n.toUpperCase() === name.toUpperCase()`.
+  - Considerar também o **nome da camada** (`node.name`), não só `characters`.
+- Assim nós com "Foi"/"Por"/"Você" são encontrados e as fontes aplicadas.
+
+---
+
+## 5. Frames decorativos substituídos por RECTANGLE
+
+- Ao substituir um frame (ex.: `decorative-2`) por um único RECTANGLE (imagem exportada), os **filhos do frame** (ex.: textos "FOI", "POR", "VOCÊ") **são removidos** do tree se não forem tratados.
+- No `replaceDecorativeFramesInTree` do fetch script:
+  - Antes de trocar o frame pelo RECTANGLE, **extrair** os nós `type === "TEXT"` (e outros que precisem permanecer).
+  - **Inserir** esses nós como filhos do **root** do nodeTree (ex.: `targetRoot.children.push(textNode)`).
+  - Chamar a função com o root explícito: `replaceDecorativeFramesInTree(nodeTree, nodeTree)`.
+- Assim os textos continuam no JSON e o plugin os cria; o override de fontes consegue encontrá-los.
+
+---
+
+## 6. Override de fontes após criação (ex.: applyPascoaOverrides)
+
+- Para templates com tipografia específica (fontes Google, posições, cores):
+  - Implementar uma função `applyXxxOverrides(root)` que percorre todos os TEXT (ex.: `collectTexts` recursivo).
+  - Carregar as fontes no início: `await figma.loadFontAsync(fontMeta);` etc.
+  - Para cada nó que corresponder (por conteúdo/nome, **case-insensitive**), carregar de novo a fonte e atribuir: `await figma.loadFontAsync(fontMeta); t.fontName = fontMeta;` (e fontSize, letterSpacing, fills, posição se necessário).
+  - Chamar o override após `createNodeFromTemplate`: `if (templateId === 'meu-template') await applyMeuTemplateOverrides(mainFrame);`
+- Ajustes de posição (ex.: mover "POR" 270px para baixo) podem ser feitos nesse override: `t.y = t.y + 270;`.
+
+---
+
+## 7. Patch no fetch-figma-template.js
+
+- Para o template em questão, no `applyXxxPatch(nodeTree)` (ou equivalente):
+  - Identificar textos por `chars.trim().toUpperCase() === "FOI"` (e equivalente para POR, VOCÊ, etc.) para que "Foi"/"Por" do Figma também sejam patchados.
+  - Definir `fontName`, `fontSize`, `lineHeight` (como número no JSON; o plugin converte para objeto PIXELS), `letterSpacing`, `textCase`, `fills`, `x`, `y`, `textAutoResize` quando aplicável.
+  - Assim o JSON já sai correto; o override no plugin garante a aplicação mesmo que o createNodeFromTemplate falhe na fonte.
+
+---
+
+## 8. Resumo de checklist (novo template com Google Fonts)
+
+1. Adicionar fontes em `GOOGLE_FONTS` (só `style: "Regular"`).
+2. Adicionar fallback em `loadFont` para as novas famílias (e variante de nome se houver).
+3. Garantir que `lineHeight` numérico no plugin vire `{ unit: 'PIXELS', value: n }`.
+4. Para auto height: `resize(w, h)` antes de `textAutoResize = 'HEIGHT'`.
+5. Em overrides e patch: comparação case-insensitive (e por nome) para encontrar nós de texto.
+6. Se um frame for substituído por RECTANGLE: extrair TEXT (e outros necessários) e colocá-los no root do nodeTree.
+7. Implementar e chamar `applyXxxOverrides(mainFrame)` após criar o carrossel quando o template exigir fontes/posições específicas.
